@@ -426,6 +426,7 @@ if __name__ == "__main__":
     print("       SISTEMA SOFTWARE FJ")
     print("================================")
 
+    # OPERACIÓN 1: Registrar un cliente válido
     # Probamos el registro de un cliente
     try:
         cliente1 = Cliente(
@@ -443,6 +444,7 @@ if __name__ == "__main__":
         print(f"\nNo se pudo registrar el cliente: {error}")
         registrar_error(f"Error al registrar cliente: {error}")
 
+    # OPERACIÓN 2: Intentar registrar un cliente con correo incorrecto
     # Probamos un correo incorrecto
     try:
         cliente2 = Cliente(
@@ -455,6 +457,7 @@ if __name__ == "__main__":
         print(f"\nError controlado: {error}")
         registrar_error(f"Error al registrar cliente: {error}")
 
+    # OPERACIÓN 3: Crear y registrar los servicios disponibles
     # Creamos los servicios disponibles
     try:
         sala = ReservaSala("S001", "Sala de reuniones", 50000)
@@ -472,12 +475,14 @@ if __name__ == "__main__":
         print(equipo.mostrar_informacion())
         print(asesoria.mostrar_informacion())
 
+        # OPERACIÓN 4: Calcular los costos de los servicios
         # Comprobamos los cálculos
         print("\n========== COSTOS ==========")
         print(f"Sala por 2 horas: ${sala.calcular_costo(2)}")
         print(f"3 equipos: ${equipo.calcular_costo(3)}")
         print(f"Asesoría por 2 horas: ${asesoria.calcular_costo(2)}")
 
+        # OPERACIÓN 5: Solicitar más equipos de los disponibles
         # Probamos una cantidad superior al inventario
         try:
             equipo.calcular_costo(15)
@@ -485,14 +490,17 @@ if __name__ == "__main__":
             print(f"\nDisponibilidad: {error}")
             registrar_error(f"Error de inventario: {error}")
 
+        # OPERACIÓN 6: Calcular un servicio aplicando descuento e impuesto
         # Probamos el cálculo con descuento e impuesto
         total = sala.calcular_costo_final(2, impuesto=19, descuento=10)
         print(f"\nSala con 10% de descuento y 19% de impuesto: ${total:.0f}")
 
+        # OPERACIÓN 7: Crear y registrar una reserva
         # Creamos una reserva pendiente
         reserva1 = Reserva("R001", cliente1, sala, 2)
         sistema.registrar_reserva(reserva1)
 
+        # OPERACIÓN 8: Intentar procesar una reserva sin confirmarla
         # Intentamos procesarla sin confirmarla
         try:
             reserva1.procesar()
@@ -500,7 +508,8 @@ if __name__ == "__main__":
             print(f"\nOperación no permitida: {error}")
             registrar_error(f"Error al procesar reserva: {error}")
 
-            # Probamos un cálculo con una cantidad inválida
+        # OPERACIÓN 9: Probar el cálculo con una cantidad inválida
+        # Probamos un cálculo con una cantidad inválida
         try:
             prueba = AlquilerEquipo("S004", "Equipo de prueba", 30000)
             prueba.calcular_costo(-2)
@@ -514,9 +523,11 @@ if __name__ == "__main__":
                 print(f"Causa original: {error_encadenado.__cause__}")
                 registrar_error(f"Error de cálculo: {error_encadenado}")
 
+        # OPERACIÓN 10: Confirmar la reserva
         # Confirmamos la reserva
         reserva1.confirmar()
 
+        # OPERACIÓN 11: Intentar registrar una reserva duplicada
         # Intentamos registrar una reserva con el mismo código
         try:
             reserva_duplicada = Reserva("R001", cliente1, sala, 1)
@@ -527,6 +538,8 @@ if __name__ == "__main__":
 
         print("\n========== RESERVA ==========")
         print(reserva1.mostrar_informacion())
+
+        # OPERACIÓN 12: Procesar la reserva confirmada
         # Procesamos la reserva y controlamos posibles errores
         try:
             costo = reserva1.procesar()
@@ -548,7 +561,8 @@ if __name__ == "__main__":
         print("\n========== LISTADO DE RESERVAS ==========")
         sistema.listar_reservas()
 
-                # Probamos la cancelación de una reserva
+        # OPERACIÓN 13: Registrar y cancelar una reserva
+        # Probamos la cancelación de una reserva
         try:
             reserva2 = Reserva("R002", cliente1, asesoria, 1)
             sistema.registrar_reserva(reserva2)
@@ -561,7 +575,8 @@ if __name__ == "__main__":
             print(f"Error al cancelar la reserva: {error}")
             registrar_error(f"Error de cancelación: {error}")
 
-                    # Intentamos cancelar nuevamente la reserva
+        # OPERACIÓN 14: Intentar cancelar nuevamente una reserva ya cancelada
+        # Intentamos cancelar nuevamente la reserva
         try:
             reserva2.cancelar()
         except OperacionNoPermitidaError as error:
@@ -573,6 +588,7 @@ if __name__ == "__main__":
         print(sistema.buscar_cliente("C001").nombre)
         print(sistema.buscar_servicio("S001").nombre)
 
+        # OPERACIÓN 15: Buscar un cliente que no está registrado
         # Probamos la búsqueda de un cliente inexistente
         try:
             sistema.buscar_cliente("C999")
