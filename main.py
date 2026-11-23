@@ -2,6 +2,7 @@
 from abc import ABC, abstractmethod
 import re
 from logs import registrar_evento, registrar_error
+from functools import singledispatchmethod
 
 
 # EXCEPCIONES PERSONALIZADAS
@@ -156,10 +157,14 @@ class Servicio(EntidadSistema):
 
     # Calculamos el costo final con impuestos y descuentos opcionales
     def calcular_costo_final(self, cantidad, impuesto=0, descuento=0):
-        if not isinstance(impuesto, (int, float)) or not 0 <= impuesto <= 100:
+        if (not isinstance(impuesto, (int, float))
+                or isinstance(impuesto, bool)
+                or not 0 <= impuesto <= 100):
             raise DatosInvalidosError("El impuesto debe estar entre 0 y 100.")
 
-        if not isinstance(descuento, (int, float)) or not 0 <= descuento <= 100:
+        if (not isinstance(descuento, (int, float))
+                or isinstance(descuento, bool)
+                or not 0 <= descuento <= 100):
             raise DatosInvalidosError("El descuento debe estar entre 0 y 100.")
 
         costo = self.calcular_costo(cantidad)
@@ -167,6 +172,21 @@ class Servicio(EntidadSistema):
         total = costo_con_descuento + (costo_con_descuento * impuesto / 100)
 
         return total
+
+    # Aplicamos ajustes según el tipo de dato recibido
+    @singledispatchmethod
+    def aplicar_ajuste(self, ajuste):
+        raise DatosInvalidosError("Tipo de ajuste no válido.")
+
+    @aplicar_ajuste.register
+    def _(self, ajuste: int):
+        if isinstance(ajuste, bool):
+            raise DatosInvalidosError("El ajuste no puede ser booleano.")
+        return self.precio_base + ajuste
+
+    @aplicar_ajuste.register
+    def _(self, ajuste: float):
+        return self.precio_base * (1 + ajuste)
 
 # SERVICIOS ESPECÍFICOS
 
@@ -182,28 +202,61 @@ class ReservaSala(Servicio):
         return f"Sala: {self.nombre} - Precio por hora: ${self.precio_base}"
 
 
-# Calculamos el costo según los equipos
+# Controlamos el alquiler y la disponibilidad de equipos
 class AlquilerEquipo(Servicio):
+
+    def __init__(self, identificador, nombre, precio_base, stock=10):
+        super().__init__(identificador, nombre, precio_base)
+
+        if not isinstance(stock, int) or isinstance(stock, bool) or stock < 0:
+            raise DatosInvalidosError("El stock debe ser un entero positivo.")
+
+        self.__stock = stock
 
     def calcular_costo(self, cantidad):
         if not isinstance(cantidad, int) or isinstance(cantidad, bool) or cantidad <= 0:
             raise DatosInvalidosError("La cantidad debe ser un número entero positivo.")
+
+        if cantidad > self.__stock:
+            raise ServicioNoDisponibleError("No hay suficientes equipos disponibles.")
+
         return self.precio_base * cantidad
 
     def mostrar_informacion(self):
-        return f"Equipo: {self.nombre} - Precio por unidad: ${self.precio_base}"
+        return (
+            f"Equipo: {self.nombre} - Precio por unidad: ${self.precio_base} "
+            f"- Disponibles: {self.__stock}"
+        )
 
+    @property
+    def stock(self):
+        return self.__stock
 
-# Calculamos el costo según las horas de asesoría
+    def disminuir_stock(self, cantidad):
+        if cantidad > self.__stock:
+            raise ServicioNoDisponibleError(
+                "No hay suficientes equipos disponibles."
+            )
+        self.__stock -= cantidad
+
+# Calculamos el costo de la asesoría según las horas contratadas
 class AsesoriaEspecializada(Servicio):
 
     def calcular_costo(self, horas):
-        if not isinstance(horas, (int, float)) or isinstance(horas, bool) or horas <= 0:
-            raise DatosInvalidosError("Las horas deben ser mayores que cero.")
+        if (not isinstance(horas, (int, float))
+                or isinstance(horas, bool)
+                or horas <= 0):
+            raise DatosInvalidosError(
+                "Las horas de asesoría deben ser mayores que cero."
+            )
+
         return self.precio_base * horas
 
     def mostrar_informacion(self):
-        return f"Asesoría: {self.nombre} - Precio por hora: ${self.precio_base}"
+        return (
+            f"Asesoría: {self.nombre} "
+            f"- Precio por hora: ${self.precio_base}"
+        )
 
 
 # CLASE RESERVA
@@ -222,6 +275,18 @@ class Reserva(EntidadSistema):
     @property
     def estado(self):
         return self.__estado
+
+    @property
+    def cliente(self):
+        return self.__cliente
+
+    @property
+    def servicio(self):
+        return self.__servicio
+
+    @property
+    def duracion(self):
+        return self.__duracion
 
     # Revisamos los datos de la reserva
     def validar(self):
@@ -264,6 +329,9 @@ class Reserva(EntidadSistema):
                 "No fue posible calcular el costo de la reserva."
             ) from error
 
+        if isinstance(self.__servicio, AlquilerEquipo):
+            self.__servicio.disminuir_stock(self.__duracion)
+
         self.__estado = "Procesada"
         registrar_evento(f"Reserva {self.identificador} procesada.")
         return costo
@@ -304,21 +372,7 @@ class SistemaGestion:
         self.servicios.append(servicio)
         registrar_evento("Servicio agregado al sistema.")
 
-    # Creamos una reserva
-    def registrar_reserva(self, reserva):
-        if not isinstance(reserva, Reserva):
-            raise ReservaInvalidaError("La reserva no es válida.")
-
-        self.buscar_cliente(reserva._Reserva__cliente.identificador)
-        self.buscar_servicio(reserva._Reserva__servicio.identificador)
-
-        if any(r.identificador == reserva.identificador for r in self.reservas):
-            raise ReservaInvalidaError("La reserva ya existe.")
-
-        self.reservas.append(reserva)
-        registrar_evento("Reserva agregada al sistema.")
-
-            # Buscamos un cliente por su identificador
+    # Buscamos un cliente por su identificador
     def buscar_cliente(self, identificador):
         for cliente in self.clientes:
             if cliente.identificador == identificador:
@@ -333,6 +387,32 @@ class SistemaGestion:
                 return servicio
 
         raise ServicioNoDisponibleError("El servicio no está registrado.")
+
+    # Creamos una reserva
+    def registrar_reserva(self, reserva):
+        if not isinstance(reserva, Reserva):
+            raise ReservaInvalidaError("La reserva no es válida.")
+
+        self.buscar_cliente(reserva._Reserva__cliente.identificador)
+        self.buscar_servicio(reserva._Reserva__servicio.identificador)
+
+        if any(r.identificador == reserva.identificador for r in self.reservas):
+            raise ReservaInvalidaError("La reserva ya existe.")
+
+        self.reservas.append(reserva)
+        registrar_evento("Reserva agregada al sistema.")
+
+    # Mostramos las reservas registradas
+    def listar_reservas(self):
+        if not self.reservas:
+            print("No hay reservas registradas.")
+            return
+
+        for reserva in self.reservas:
+            print(reserva.mostrar_informacion())
+            print("-------------------------")
+
+
 
 
 # PRUEBAS INICIALES
@@ -398,6 +478,13 @@ if __name__ == "__main__":
         print(f"3 equipos: ${equipo.calcular_costo(3)}")
         print(f"Asesoría por 2 horas: ${asesoria.calcular_costo(2)}")
 
+        # Probamos una cantidad superior al inventario
+        try:
+            equipo.calcular_costo(15)
+        except ServicioNoDisponibleError as error:
+            print(f"\nDisponibilidad: {error}")
+            registrar_error(f"Error de inventario: {error}")
+
         # Probamos el cálculo con descuento e impuesto
         total = sala.calcular_costo_final(2, impuesto=19, descuento=10)
         print(f"\nSala con 10% de descuento y 19% de impuesto: ${total:.0f}")
@@ -456,6 +543,30 @@ if __name__ == "__main__":
         print(f"Clientes: {len(sistema.clientes)}")
         print(f"Servicios: {len(sistema.servicios)}")
         print(f"Reservas: {len(sistema.reservas)}")
+
+        # Mostramos las reservas registradas
+        print("\n========== LISTADO DE RESERVAS ==========")
+        sistema.listar_reservas()
+
+                # Probamos la cancelación de una reserva
+        try:
+            reserva2 = Reserva("R002", cliente1, asesoria, 1)
+            sistema.registrar_reserva(reserva2)
+            reserva2.cancelar()
+
+            print("\n========== CANCELACIÓN ==========")
+            print(reserva2.mostrar_informacion())
+
+        except (ReservaInvalidaError, OperacionNoPermitidaError) as error:
+            print(f"Error al cancelar la reserva: {error}")
+            registrar_error(f"Error de cancelación: {error}")
+
+                    # Intentamos cancelar nuevamente la reserva
+        try:
+            reserva2.cancelar()
+        except OperacionNoPermitidaError as error:
+            print(f"\nCancelación no permitida: {error}")
+            registrar_error(f"Error de cancelación: {error}")
 
         # Probamos las búsquedas
         print("\n========== BÚSQUEDAS ==========")
