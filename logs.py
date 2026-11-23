@@ -1,7 +1,7 @@
-# Importamos la herramienta para guardar los registros
+# Importamos la herramienta para guardar los registros 
 import logging
 
-# Configuramos el archivo donde se guardarán los eventos
+# Configuramos el archivo donde se guardarán los eventos 
 logging.basicConfig(
     filename="software_fj.log",
     level=logging.INFO,
@@ -9,7 +9,7 @@ logging.basicConfig(
     encoding="utf-8"
 )
 
-# Guardamos las acciones realizadas en el sistema
+# Guardamos las acciones realizadas en el sistema 
 def registrar_evento(mensaje):
     logging.info(mensaje)
 
